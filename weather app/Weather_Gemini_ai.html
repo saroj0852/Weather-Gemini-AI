@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ease Weather</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      transition: background 0.5s ease-in-out, color 0.5s ease-in-out;
+    }
+    .weather-card {
+      background: rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      border:1px solid rgba(255,255,255,0.3);
+      animation: fadeIn 0.6s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity:0; transform: translateY(20px); }
+      to { opacity:1; transform: translateY(0); }
+    }
+    .loader {
+      border:4px solid rgba(255,255,255,0.3);
+      border-left-color:#fff;
+      border-radius:50%;width:40px;height:40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg);} }
+    .forecast-card { transition: transform 0.3s, box-shadow 0.3s; }
+    .forecast-card:hover { transform: scale(1.1); box-shadow: 0 4px 20px rgba(255,255,255,0.3); }
+    .typing { border-right: 2px solid rgba(255,255,255,0.7); white-space: pre-wrap; overflow: hidden; }
+    .modal-overlay { background:rgba(0,0,0,0.5); backdrop-filter:blur(5px); }
+    
+    /* 🎨 Themes */
+    .theme-default { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); color: #fff; }
+    .theme-light { background: linear-gradient(135deg,#f9d423 0%,#ff4e50 100%); color: #222; }
+    .theme-dark { background: linear-gradient(135deg,#0f2027,#203a43,#2c5364); color: #eee; }
+    .theme-sunset { background: linear-gradient(135deg,#ff9a9e,#fad0c4); color: #400; }
+    .theme-forest { background: linear-gradient(135deg,#a8e063,#56ab2f); color: #042; }
+    .theme-ocean { background: linear-gradient(135deg,#2E3192,#1BFFFF); color: #011; }
+    
+    .theme-light .weather-card { background: rgba(255,255,255,0.7); color:#222; }
+  </style>
+</head>
+<body class="theme-default flex flex-col items-center justify-center min-h-screen p-4 transition-colors duration-500">
+
+  <div class="w-full max-w-4xl mx-auto">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold mb-4 sm:mb-0">Ease Weather 🌦️</h1>
+      
+      <div class="flex items-center gap-4">
+        <!-- Theme Selector -->
+        <select id="theme-selector" class="bg-white/20 px-3 py-2 rounded-full text-sm">
+          <option value="theme-default">Default</option>
+          <option value="theme-light">Light</option>
+          <option value="theme-dark">Dark</option>
+          <option value="theme-sunset">Sunset</option>
+          <option value="theme-forest">Forest</option>
+          <option value="theme-ocean">Ocean</option>
+        </select>
+        <!-- Random Theme -->
+        <button id="random-theme" class="bg-white/20 px-3 py-2 rounded-full hover:bg-white/30 transition">🎲 Random</button>
+      </div>
+    </header>
+
+    <!-- Search Section -->
+    <div class="flex flex-col items-center mb-6">
+      <!-- Search Bar -->
+      <div class="relative w-full sm:w-96 mb-4">
+        <div class="search-bar flex items-center bg-white/20 rounded-full shadow-lg transition-all duration-300">
+          <svg class="w-5 h-5 text-white/70 ml-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="text" id="search-input" placeholder="Search for a location"
+           class="w-full bg-transparent text-white placeholder-white/70 py-2 px-4 focus:outline-none"/>
+        </div>
+      </div>
+
+      <!-- Location Button -->
+      <button id="current-location-btn"
+       class="flex items-center gap-2 px-4 py-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors">
+        📍 Use Current Location
+      </button>
+    </div>
+
+    <!-- Weather Container -->
+    <main id="weather-container" class="weather-card rounded-2xl p-6 shadow-2xl">
+      <div id="loader" class="flex justify-center items-center h-96">
+        <div class="loader"></div>
+      </div>
+      <div id="weather-content" class="hidden">
+        <!-- Current Weather -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
+          <div class="flex items-center gap-4">
+            <img id="weather-icon" class="w-24 h-24" src="" alt="Weather Icon"/>
+            <div>
+              <h2 id="city-name" class="text-3xl font-bold">--</h2>
+              <p id="current-date" class="text-lg opacity-80">--</p>
+              <p id="weather-description" class="capitalize font-medium">--</p>
+            </div>
+          </div>
+          <div class="text-center md:text-right">
+            <p id="current-temp" class="text-7xl font-bold">--°</p>
+            <p id="feels-like" class="opacity-80">Feels like --°</p>
+            <button id="unit-toggle" class="mt-2 bg-white/20 px-3 py-1 rounded-full hover:bg-white/30 transition">Switch to °F</button>
+          </div>
+        </div>
+
+        <!-- Details -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mb-8 bg-white/10 p-4 rounded-xl">
+          <div><p class="font-bold text-xl" id="humidity">--%</p><p class="opacity-80 text-sm">Humidity</p></div>
+          <div><p class="font-bold text-xl" id="wind-speed">-- km/h</p><p class="opacity-80 text-sm">Wind</p></div>
+          <div><p class="font-bold text-xl" id="pressure">-- hPa</p><p class="opacity-80 text-sm">Pressure</p></div>
+          <div><p class="font-bold text-xl" id="visibility">-- km</p><p class="opacity-80 text-sm">Visibility</p></div>
+        </div>
+
+        <!-- Gemini Button -->
+        <div class="text-center mb-8">
+          <button id="gemini-advice-btn"
+           class="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600
+           text-white font-bold py-3 px-6 rounded-full shadow-lg transform hover:scale-105 transition-all">
+            Get Today's Vibe ✨
+          </button>
+        </div>
+
+        <!-- Forecast -->
+        <div class="space-y-4">
+          <h3 class="text-xl font-semibold mb-4">7-Day Forecast</h3>
+          <div id="forecast-container" class="flex overflow-x-auto space-x-4 pb-4"></div>
+        </div>
+      </div>
+      <div id="error-message" class="hidden text-center p-8">
+        <p class="text-xl font-semibold">Could not find location</p>
+        <p class="opacity-80">Please check the spelling or try another city.</p>
+      </div>
+    </main>
+     <!-- Footer -->
+    <footer class="mt-8 text-center text-white/70 text-sm">
+      © Saroj Mohapatra | 2025 |
+    </footer>
+  </div>
+
+  <!-- Gemini Modal -->
+  <div id="gemini-modal" class="fixed inset-0 z-50 items-center justify-center hidden modal-overlay">
+    <div class="weather-card rounded-2xl p-6 shadow-2xl w-11/12 max-w-md mx-auto relative text-white">
+      <button id="close-modal-btn" class="absolute top-4 right-4 text-white hover:text-white/70">✖</button>
+      <h3 class="text-2xl font-bold mb-4 text-center">Today's Vibe ✨</h3>
+      <div id="gemini-loader" class="flex justify-center items-center h-32">
+        <div class="loader"></div>
+      </div>
+      <div id="gemini-content" class="hidden space-y-4 typing"></div>
+    </div>
+  </div>
+
+  <script>
+    // 🔑 API Keys
+       const weatherApiKey = "4d121da8e8b043b2afb170117253008"; // ✅ Weather API key
+    const geminiApiKey = "AIzaSyCnPK_7MWdRrN3ZUXd8dFG89A8CnHZXgYY";
+    // Theme handling
+    const themes = ["theme-default","theme-light","theme-dark","theme-sunset","theme-forest","theme-ocean"];
+    const themeSelector = document.getElementById("theme-selector");
+    const randomThemeBtn = document.getElementById("random-theme");
+
+    themeSelector.addEventListener("change", () => {
+      document.body.className = themeSelector.value + " flex flex-col items-center justify-center min-h-screen p-4 transition-colors duration-500";
+    });
+
+    randomThemeBtn.addEventListener("click", () => {
+      const random = themes[Math.floor(Math.random()*themes.length)];
+      document.body.className = random + " flex flex-col items-center justify-center min-h-screen p-4 transition-colors duration-500";
+      themeSelector.value = random;
+    });
+     // Elements
+    const searchInput=document.getElementById('search-input');
+    const loader=document.getElementById('loader');
+    const weatherContent=document.getElementById('weather-content');
+    const errorMessage=document.getElementById('error-message');
+    const currentLocationBtn=document.getElementById('current-location-btn');
+    const geminiAdviceBtn=document.getElementById('gemini-advice-btn');
+    const geminiModal=document.getElementById('gemini-modal');
+    const closeModalBtn=document.getElementById('close-modal-btn');
+    const geminiLoader=document.getElementById('gemini-loader');
+    const geminiContent=document.getElementById('gemini-content');
+    const unitToggle=document.getElementById("unit-toggle");
+    let currentWeatherData=null;
+    let isCelsius=true;
+
+    const showLoading=()=>{weatherContent.classList.add('hidden');errorMessage.classList.add('hidden');loader.classList.remove('hidden');}
+    const showContent=()=>{loader.classList.add('hidden');errorMessage.classList.add('hidden');weatherContent.classList.remove('hidden');}
+    const showError=()=>{loader.classList.add('hidden');weatherContent.classList.add('hidden');errorMessage.classList.remove('hidden');}
+
+    async function fetchWeatherData(query){
+      showLoading();
+      try{
+        const url=`https://api.weatherapi.com/v1/forecast.json?key=${weatherApiKey}&q=${query}&days=7`;
+        const res=await fetch(url);
+        if(!res.ok) throw new Error("City not found");
+        const data=await res.json();
+        currentWeatherData=data;
+        updateCurrentWeatherUI(data);
+        updateForecastUI(data);
+        showContent();
+      }catch(err){console.error(err);currentWeatherData=null;showError();}
+    }
+
+    function updateCurrentWeatherUI(data){
+      document.getElementById('city-name').textContent=data.location.name;
+      document.getElementById('current-date').textContent=new Date(data.location.localtime)
+        .toLocaleString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+      document.getElementById('weather-description').textContent=data.current.condition.text;
+      document.getElementById('weather-icon').src=`https:${data.current.condition.icon}`;
+      document.getElementById('current-temp').textContent=`${Math.round(data.current.temp_c)}°`;
+      document.getElementById('feels-like').textContent=`Feels like ${Math.round(data.current.feelslike_c)}°`;
+      document.getElementById('humidity').textContent=`${data.current.humidity}%`;
+      document.getElementById('wind-speed').textContent=`${data.current.wind_kph.toFixed(1)} km/h`;
+      document.getElementById('pressure').textContent=`${data.current.pressure_mb} hPa`;
+      document.getElementById('visibility').textContent=`${data.current.vis_km.toFixed(1)} km`;
+    }
+
+    function updateForecastUI(data){
+      const container=document.getElementById('forecast-container');
+      container.innerHTML="";
+      data.forecast.forecastday.forEach(day=>{
+        const name=new Date(day.date).toLocaleDateString('en-US',{weekday:'short'});
+        container.innerHTML+=`
+          <div class="forecast-card flex flex-col items-center text-center p-3 rounded-lg bg-white/10 flex-shrink-0 w-24">
+            <p class="font-semibold">${name}</p>
+            <img class="w-12 h-12 my-1" src="https:${day.day.condition.icon}" alt="${day.day.condition.text}">
+            <p class="font-bold">${Math.round(day.day.maxtemp_c)}°</p>
+            <p class="opacity-70">${Math.round(day.day.mintemp_c)}°</p>
+          </div>`;
+      });
+    }
+
+    function getUserLocation(){
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(
+          pos=>fetchWeatherData(`${pos.coords.latitude},${pos.coords.longitude}`),
+          ()=>fetchWeatherData("London")
+        );
+      }else fetchWeatherData("London");
+    }
+
+    // Gemini typing effect
+    function typeText(element,text,speed=30){
+      element.textContent="";
+      let i=0;
+      function typing(){
+        if(i<text.length){
+          element.textContent+=text.charAt(i);
+          i++;
+          setTimeout(typing,speed);
+        }
+      }
+      typing();
+    }
+
+    async function getWeatherAdvice(){
+      if(!currentWeatherData){geminiContent.innerHTML="<p>Please fetch weather first.</p>";return;}
+      geminiModal.style.display='flex';geminiContent.classList.add('hidden');geminiLoader.classList.remove('hidden');
+      const {location,current}=currentWeatherData;
+      const prompt=`You are a friendly assistant. Based on weather in ${location.name}: ${current.temp_c}°C, feels like ${current.feelslike_c}°C, ${current.condition.text}. Suggest: 1 outfit, 1 outdoor activity, 1 indoor activity. Use emojis.`;
+      const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+      try{
+        const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+        const result=await res.json();
+        const text=result.candidates?.[0]?.content?.parts?.[0]?.text||"No advice.";
+        geminiLoader.classList.add('hidden');
+        geminiContent.classList.remove('hidden');
+        typeText(geminiContent,text);
+      }catch(e){console.error(e);geminiContent.innerHTML="<p>Error fetching Gemini advice.</p>";}
+    }
+
+    // Events
+    searchInput.addEventListener('keypress',e=>{if(e.key==='Enter'&&searchInput.value){fetchWeatherData(searchInput.value);searchInput.value='';}});
+    currentLocationBtn.addEventListener('click',getUserLocation);
+    geminiAdviceBtn.addEventListener('click',getWeatherAdvice);
+    closeModalBtn.addEventListener('click',()=>geminiModal.style.display='none');
+    document.addEventListener('DOMContentLoaded',getUserLocation);
+
+    // Theme toggle
+    document.getElementById("theme-toggle").addEventListener("click",()=>{
+      document.body.classList.toggle("light-theme");
+    });
+
+    // Temp unit toggle
+    unitToggle.addEventListener("click",()=>{
+      if(!currentWeatherData) return;
+      if(isCelsius){
+        document.getElementById("current-temp").textContent=`${Math.round((currentWeatherData.current.temp_c*9/5)+32)}°`;
+        unitToggle.textContent="Switch to °C";
+      } else {
+        document.getElementById("current-temp").textContent=`${Math.round(currentWeatherData.current.temp_c)}°`;
+        unitToggle.textContent="Switch to °F";
+      }
+      isCelsius=!isCelsius;
+    });
+
+    // The rest of your weather + Gemini JS (same as before, no footer needed)
+    // ...
+  </script>
+</body>
+</html>
